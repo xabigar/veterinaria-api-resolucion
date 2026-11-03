@@ -1,0 +1,21 @@
+{
+  "name": "veterinaria-api",
+  "version": "1.0.0",
+  "description": "Sistemas Web · API REST de veterinaria (Express + Mongoose)",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node seed.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "dotenv": "18.0.7",
+    "express": "5.3.0",
+    "mongodb-memory-server": "11.3.0",
+    "mongoose": "9.11.2"
+  }
+}

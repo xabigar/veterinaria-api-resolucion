@@ -1,0 +1,137 @@
+# API de veterinaria · pruebas
+# VS Code + extensión "REST Client": pulsa "Send Request" encima de cada petición.
+# Thunder Client / Postman: copia el método, la URL y el cuerpo.
+# Para volver a los datos iniciales: reinicia el servidor.
+
+@base = http://localhost:3000
+
+############################ DUEÑOS
+
+### Todos los dueños (dado)
+GET {{base}}/api/owners
+
+### 1. Crear un dueño → 201
+# @name newOwner
+POST {{base}}/api/owners
+Content-Type: application/json
+
+{ "name": "Carmen", "email": "carmen@mail.com" }
+
+### 1b. Email duplicado → 409
+POST {{base}}/api/owners
+Content-Type: application/json
+
+{ "name": "Carmen bis", "email": "carmen@mail.com" }
+
+### 1c. Email no válido → 400
+POST {{base}}/api/owners
+Content-Type: application/json
+
+{ "name": "Desconocido", "email": "no-es-un-email" }
+
+############################ MASCOTAS (dado)
+
+### Crear una mascota → 201
+# @name newPet
+POST {{base}}/api/pets
+Content-Type: application/json
+
+{ "name": "Kira", "species": "dog", "owner": "{{newOwner.response.body.$._id}}" }
+
+### species no válido → 400
+POST {{base}}/api/pets
+Content-Type: application/json
+
+{ "name": "Nemo", "species": "fish", "owner": "{{newOwner.response.body.$._id}}" }
+
+### Perros
+GET {{base}}/api/pets?species=dog
+
+############################ VETERINARIOS
+
+### Crear un veterinario (dado)
+# @name newVet
+POST {{base}}/api/vets
+Content-Type: application/json
+
+{ "name": "Jon Arrieta", "speciality": "gatos", "availableDays": ["martes"] }
+
+### 2. Disponibles el lunes O especializados en aves
+GET {{base}}/api/vets?day=lunes&speciality=aves
+
+### 2b. Solo un parámetro: especializados en gatos
+GET {{base}}/api/vets?speciality=gatos
+
+### 2c. Sin parámetros: todos los veterinarios
+GET {{base}}/api/vets
+
+### 3. Actualizar el email del veterinario → 200
+PATCH {{base}}/api/vets/{{newVet.response.body.$._id}}
+Content-Type: application/json
+
+{ "email": "jon@clinica.eus" }
+
+### 3b. Email no válido → 400 (runValidators)
+PATCH {{base}}/api/vets/{{newVet.response.body.$._id}}
+Content-Type: application/json
+
+{ "email": "jon" }
+
+### 3c. No existe → 404
+PATCH {{base}}/api/vets/000000000000000000000000
+Content-Type: application/json
+
+{ "email": "jon@clinica.eus" }
+
+### 3d. ID no válido → 400 (CastError)
+PATCH {{base}}/api/vets/abc
+Content-Type: application/json
+
+{ "email": "jon@clinica.eus" }
+
+############################ CITAS
+
+### 4. Crear una cita → 201 (usa una fecha futura)
+POST {{base}}/api/appointments
+Content-Type: application/json
+
+{
+  "date": "2026-12-15T10:00:00Z",
+  "reason": "Revisión anual",
+  "pet": "{{newPet.response.body.$._id}}",
+  "vet": "{{newVet.response.body.$._id}}"
+}
+
+### 4b. La mascota no existe → 400
+POST {{base}}/api/appointments
+Content-Type: application/json
+
+{
+  "date": "2026-12-15T10:00:00Z",
+  "reason": "Revisión anual",
+  "pet": "000000000000000000000000",
+  "vet": "{{newVet.response.body.$._id}}"
+}
+
+### 5. Próximas citas programadas (populate: pet → owner, vet)
+GET {{base}}/api/appointments/upcoming
+
+### 5b. Próximas citas de un veterinario (?vet=id)
+GET {{base}}/api/appointments/upcoming?vet={{newVet.response.body.$._id}}
+
+### 6. Eliminar las citas pasadas → { "deleted": N }
+DELETE {{base}}/api/appointments/past
+
+### Todas las citas (dado)
+GET {{base}}/api/appointments
+
+############################ RETO (parte 3)
+
+### Reto: ruta desconocida → 404 en JSON
+GET {{base}}/api/nada
+
+### Reto: varios campos incorrectos → 400 con la lista de campos
+POST {{base}}/api/pets
+Content-Type: application/json
+
+{ "species": "fish" }
