@@ -1,29 +1,65 @@
 # API de veterinaria · pruebas
-# VS Code + extensión "REST Client": pulsa "Send Request" encima de cada petición.
-# Thunder Client / Postman: copia el método, la URL y el cuerpo.
-# Para volver a los datos iniciales: reinicia el servidor.
+# -----------------------------------------------------------------------------
+# CÓMO USARLO
+#  1. Arranca la API: npm run dev  (http://localhost:3000)
+#  2. VS Code + extensión "REST Client": pulsa "Send Request" encima de cada petición.
+#     Thunder Client / Postman / curl: copia el método, la URL y el cuerpo.
+#  3. Ejecuta primero la PREPARACIÓN (3 peticiones dadas). Después, en cualquier orden.
+#  4. Este fichero NO comprueba nada: compara tú la respuesta con el "Esperado" de
+#     cada petición. El título indica el código HTTP esperado (→ 201, → 409…).
+#  5. Para volver a los datos iniciales: reinicia el servidor
+#     (y si repites la preparación, aparecerán veterinarios y mascotas duplicados).
+#
+# DATOS DE EJEMPLO
+#  Dueños: Alice, Bob · Mascotas: Rex, Mimi, Luna, Txio
+#  Veterinarios: Ane (perros; lunes, miércoles) · Mikel (gatos; lunes, viernes)
+#                Irati (aves; jueves)
+#  Citas: 2 pasadas (done) · 3 futuras programadas · 1 futura cancelada
+# -----------------------------------------------------------------------------
 
 @base = http://localhost:3000
 
-############################ DUEÑOS
+############################ PREPARACIÓN (dado: ejecútalas primero)
 
-### Todos los dueños (dado)
+### 0a. Dueños (dado) → 200
+# Esperado: lista con Alice y Bob. La mascota nueva usará el primero.
+# @name owners
 GET {{base}}/api/owners
 
+### 0b. Crear una mascota (dado) → 201
+# Esperado: la mascota Kira creada, con su _id.
+# @name newPet
+POST {{base}}/api/pets
+Content-Type: application/json
+
+{ "name": "Kira", "species": "dog", "owner": "{{owners.response.body.$[0]._id}}" }
+
+### 0c. Crear un veterinario (dado) → 201
+# Esperado: Jon Arrieta creado, con su _id (gatos; martes).
+# @name newVet
+POST {{base}}/api/vets
+Content-Type: application/json
+
+{ "name": "Jon Arrieta", "speciality": "gatos", "availableDays": ["martes"] }
+
+############################ DUEÑOS
+
 ### 1. Crear un dueño → 201
-# @name newOwner
+# Esperado: 201 y el dueño creado.
 POST {{base}}/api/owners
 Content-Type: application/json
 
 { "name": "Carmen", "email": "carmen@mail.com" }
 
 ### 1b. Email duplicado → 409
+# Esperado: 409 (ejecútala después de la 1).
 POST {{base}}/api/owners
 Content-Type: application/json
 
 { "name": "Carmen bis", "email": "carmen@mail.com" }
 
 ### 1c. Email no válido → 400
+# Esperado: 400.
 POST {{base}}/api/owners
 Content-Type: application/json
 
@@ -31,59 +67,62 @@ Content-Type: application/json
 
 ############################ MASCOTAS (dado)
 
-### Crear una mascota → 201
-# @name newPet
-POST {{base}}/api/pets
-Content-Type: application/json
-
-{ "name": "Kira", "species": "dog", "owner": "{{newOwner.response.body.$._id}}" }
-
 ### species no válido → 400
+# Esperado: 400.
 POST {{base}}/api/pets
 Content-Type: application/json
 
-{ "name": "Nemo", "species": "fish", "owner": "{{newOwner.response.body.$._id}}" }
+{ "name": "Nemo", "species": "fish", "owner": "{{owners.response.body.$[0]._id}}" }
 
-### Perros
+### Perros → 200
+# Esperado: Rex, Luna y Kira.
 GET {{base}}/api/pets?species=dog
 
 ############################ VETERINARIOS
 
-### Crear un veterinario (dado)
-# @name newVet
-POST {{base}}/api/vets
-Content-Type: application/json
-
-{ "name": "Jon Arrieta", "speciality": "gatos", "availableDays": ["martes"] }
-
-### 2. Disponibles el lunes O especializados en aves
+### 2. Los dos filtros a la vez: lunes O aves → 200
+# Esperado: Ane y Mikel (lunes) + Irati (aves) = 3. Jon no (martes, gatos).
 GET {{base}}/api/vets?day=lunes&speciality=aves
 
-### 2b. Solo un parámetro: especializados en gatos
+### 2b. Solo el día → 200
+# Esperado: Ane y Mikel.
+GET {{base}}/api/vets?day=lunes
+
+### 2c. Solo la especialidad → 200
+# Esperado: Mikel y Jon (gatos).
 GET {{base}}/api/vets?speciality=gatos
 
-### 2c. Sin parámetros: todos los veterinarios
+### 2d. Sin parámetros: todos los veterinarios → 200
+# Esperado: los 4 (Ane, Mikel, Irati, Jon).
 GET {{base}}/api/vets
 
+### 2e. Sin coincidencias → 200
+# Esperado: lista vacía [] (nadie atiende los domingos).
+GET {{base}}/api/vets?day=domingo
+
 ### 3. Actualizar el email del veterinario → 200
+# Esperado: Jon con "email": "jon@clinica.eus".
 PATCH {{base}}/api/vets/{{newVet.response.body.$._id}}
 Content-Type: application/json
 
 { "email": "jon@clinica.eus" }
 
 ### 3b. Email no válido → 400 (runValidators)
+# Esperado: 400. Sin runValidators: true, lo aceptaría.
 PATCH {{base}}/api/vets/{{newVet.response.body.$._id}}
 Content-Type: application/json
 
 { "email": "jon" }
 
 ### 3c. No existe → 404
+# Esperado: 404.
 PATCH {{base}}/api/vets/000000000000000000000000
 Content-Type: application/json
 
 { "email": "jon@clinica.eus" }
 
 ### 3d. ID no válido → 400 (CastError)
+# Esperado: 400.
 PATCH {{base}}/api/vets/abc
 Content-Type: application/json
 
@@ -91,46 +130,72 @@ Content-Type: application/json
 
 ############################ CITAS
 
-### 4. Crear una cita → 201 (usa una fecha futura)
+### 4. Crear una cita → 201
+# Esperado: 201 y la cita, con "status": "scheduled". La fecha es siempre dentro de 7 días.
 POST {{base}}/api/appointments
 Content-Type: application/json
 
 {
-  "date": "2026-12-15T10:00:00Z",
+  "date": "{{$datetime iso8601 7 d}}",
   "reason": "Revisión anual",
   "pet": "{{newPet.response.body.$._id}}",
   "vet": "{{newVet.response.body.$._id}}"
 }
 
 ### 4b. La mascota no existe → 400
+# Esperado: 400.
 POST {{base}}/api/appointments
 Content-Type: application/json
 
 {
-  "date": "2026-12-15T10:00:00Z",
+  "date": "{{$datetime iso8601 7 d}}",
   "reason": "Revisión anual",
   "pet": "000000000000000000000000",
   "vet": "{{newVet.response.body.$._id}}"
 }
 
-### 5. Próximas citas programadas (populate: pet → owner, vet)
+### 4c. El veterinario no existe → 400
+# Esperado: 400.
+POST {{base}}/api/appointments
+Content-Type: application/json
+
+{
+  "date": "{{$datetime iso8601 7 d}}",
+  "reason": "Revisión anual",
+  "pet": "{{newPet.response.body.$._id}}",
+  "vet": "000000000000000000000000"
+}
+
+### 5. Próximas citas programadas → 200
+# Esperado: las 3 de ejemplo (+ las que hayas creado con la 4), ordenadas por fecha.
+# Sin la cancelada ni las pasadas. Cada cita trae "vet" y "pet" (y dentro, "owner").
 GET {{base}}/api/appointments/upcoming
 
-### 5b. Próximas citas de un veterinario (?vet=id)
+### 5b. Próximas citas de un veterinario (?vet=id) → 200
+# Esperado: solo la de Jon creada con la 4 (ejecútala antes).
 GET {{base}}/api/appointments/upcoming?vet={{newVet.response.body.$._id}}
 
-### 6. Eliminar las citas pasadas → { "deleted": N }
+### 5c. ?vet= con un ID no válido → 400
+# Esperado: 400.
+GET {{base}}/api/appointments/upcoming?vet=abc
+
+### 6. Eliminar las citas pasadas → 200
+# Esperado: { "deleted": 2 } la primera vez (las 2 pasadas de ejemplo); después, 0.
 DELETE {{base}}/api/appointments/past
 
-### Todas las citas (dado)
+### Todas las citas (dado) → 200
+# Esperado: tras la 6, ya no están las pasadas.
 GET {{base}}/api/appointments
 
 ############################ RETO (parte 3)
 
 ### Reto: ruta desconocida → 404 en JSON
+# Esperado (con el reto): 404 y un JSON con "error". Sin el reto: 404 en HTML.
 GET {{base}}/api/nada
 
 ### Reto: varios campos incorrectos → 400 con la lista de campos
+# Esperado (con el reto): 400 y los campos que fallan (name, species y owner).
+# Sin el reto: 400 con un solo mensaje.
 POST {{base}}/api/pets
 Content-Type: application/json
 
